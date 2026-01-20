@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>资产收益追踪系统</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+
+    <!-- Tailwind配置 -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3B82F6',
+                        secondary: '#6366F1',
+                        success: '#10B981',
+                        warning: '#F59E0B',
+                        danger: '#EF4444',
+                        neutral: '#64748B',
+                        light: '#F8FAFC',
+                        dark: '#1E293B'
+                    },
+                    fontFamily: {
+                        inter: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .card-shadow {
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            }
+            .input-focus {
+                @apply focus:ring-2 focus:ring-primary/30 focus:border-primary focus:outline-none;
+            }
+        }
+    </style>
+</head>
+
+<body class="font-inter bg-gray-50 text-dark min-h-screen">
+    <header class="bg-white shadow-sm sticky top-0 z-10">
+        <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+            <h1 class="text-[clamp(1.5rem,3vw,2rem)] font-bold text-primary flex items-center">
+                <i class="fa fa-line-chart mr-2"></i>资产收益追踪系统
+            </h1>
+            <div class="text-sm text-neutral">
+                <span id="current-date" class="font-medium"></span>
+            </div>
+        </div>
+    </header>
+
+    <main class="container mx-auto px-4 py-6">
+        <!-- 第一行：输入区域 + 当前配比 -->
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
+            <!-- 当前市值输入 -->
+            <div class="bg-white rounded-xl p-5 card-shadow transition-all duration-300 hover:shadow-lg">
+                <h2 class="text-lg font-semibold mb-4 text-dark flex items-center">
+                    <i class="fa fa-pencil-square-o text-primary mr-2"></i>输入当前市值
+                </h2>
+                <p class="text-xs text-neutral mb-4">输入框支持加法表达式</p>
+
+                <div id="worth-inputs-container" class="space-y-3">
+                    <!-- 市值输入项将动态生成在这里 -->
+                </div>
+
+                <button id="submit-worth-button"
+                    class="w-full mt-5 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-all duration-300 flex items-center justify-center">
+                    <i class="fa fa-paper-plane mr-2"></i>提交
+                </button>
+            </div>
+
+            <!-- 当前配比 -->
+            <div class="bg-white rounded-xl p-5 card-shadow transition-all duration-300 hover:shadow-lg">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-semibold text-dark flex items-center">
+                        <i class="fa fa-pie-chart text-primary mr-2"></i>当前配比
+                    </h2>
+                    <div class="flex items-center">
+                        <select id="allocation-type-select"
+                            class="px-2 py-1 border border-gray-200 rounded text-sm bg-white input-focus">
+                            <option value="worth">现值</option>
+                            <option value="principal">本金</option>
+                            <option value="profit">利润</option>
+                        </select>
+                        <button id="draw-allocation-button"
+                            class="ml-2 px-3 py-1 bg-primary text-white rounded-lg hover:bg-primary/90 transition-all duration-300 text-sm">
+                            绘制
+                        </button>
+                    </div>
+                </div>
+
+                <div class="h-64 flex items-center justify-center">
+                    <canvas id="allocationChart"></canvas>
+                </div>
+            </div>
+
+            <!-- 资金流动记录 -->
+            <div class="bg-white rounded-xl p-5 card-shadow transition-all duration-300 hover:shadow-lg lg:col-span-2">
+                <h2 class="text-lg font-semibold mb-4 text-dark flex items-center">
+                    <i class="fa fa-exchange text-primary mr-2"></i>资金流动记录
+                </h2>
+                <p class="text-xs text-neutral mb-4">输入资金流动信息后需要接着输入当前市值才能获取最新收益情况 <span
+                        class="text-xs font-medium">正负号表示流动方向</span></p>
+
+                <div class="flex items-center justify-center py-6 relative">
+
+
+                    <div class="flex items-center space-x-6">
+                        <div class="text-center">
+                            <div
+                                class="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                                <span class="text-xs font-medium">其他</span>
+                            </div>
+                        </div>
+
+                        <i class="fa fa-exchange text-primary text-xl"></i>
+
+                        <div class="text-center">
+                            <div
+                                class="w-16 h-16 bg-primary/5 rounded-full flex items-center justify-center mx-auto mb-2">
+                                <span class="text-sm font-semibold text-primary">现金</span>
+                            </div>
+                        </div>
+
+                        <i class="fa fa-exchange text-primary text-xl"></i>
+
+                        <div class="text-center">
+                            <div
+                                class="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                                <span class="text-xs font-medium">理财</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div
+                        class="absolute top-1/2 right-4 -translate-y-1/2 bg-white border border-gray-200 rounded-md px-2 py-1 flex items-center text-sm">
+                        <select id="flow-type-select" class="text-xs bg-transparent focus:outline-none">
+                            <option>加载中...</option>
+                        </select>
+                        <input id="flow-value-input" type="number" class="ml-1 w-20 text-sm focus:outline-none"
+                            placeholder="输入金额">
+                    </div>
+                </div>
+
+                <div class="flex justify-center space-x-4">
+                    <button id="submit-flow-button"
+                        class="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-all duration-300">
+                        确定
+                    </button>
+                    <button id="cancel-flow-button"
+                        class="px-6 py-2 bg-white border border-gray-200 text-neutral rounded-lg hover:bg-gray-50 transition-all duration-300">
+                        取消
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 第二行：展示区域 -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <!-- 收益表格 -->
+            <div class="bg-white rounded-xl p-5 card-shadow transition-all duration-300 hover:shadow-lg">
+                <h2 class="text-lg font-semibold mb-4 text-dark flex items-center">
+                    <i class="fa fa-table text-primary mr-2"></i>展示收益
+                </h2>
+                <p class="text-xs text-neutral mb-4">
+                    起始计算日：将现值设置为本金的日期，也就是开始算账的起始日期<br>
+                    本金变动通过流动信息叠加起始本金动态计算<br>
+                    现值：可指定日期展示<br>
+                    本金日期 &lt; 现值日期的最大日期<br>
+                    绘图以现值历史日期为横刻度
+                </p>
+
+                <div class="flex flex-wrap items-center gap-3 mb-4">
+                    <div class="flex items-center">
+                        <label class="text-sm mr-2 font-medium text-neutral">起始本金日</label>
+                        <input type="date" id="start-date-input" value="2026-01-17"
+                            class="px-3 py-1.5 border border-gray-200 rounded-lg input-focus text-sm">
+                    </div>
+                    <div class="flex items-center">
+                        <label class="text-sm mr-2 font-medium text-neutral">现值日</label>
+                        <input type="date" id="end-date-input" value="2026-01-17"
+                            class="px-3 py-1.5 border border-gray-200 rounded-lg input-focus text-sm">
+                    </div>
+                    <button id="calculate-profit-button"
+                        class="px-3 py-1.5 bg-neutral text-white rounded-lg hover:bg-neutral/90 transition-all duration-300 text-sm">
+                        计算
+                    </button>
+                    <button
+                        class="px-3 py-1.5 bg-primary text-white rounded-lg hover:bg-primary/90 transition-all duration-300 text-sm">
+                        <i class="fa fa-bar-chart mr-1"></i>绘图
+                    </button>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="min-w-full text-sm">
+                        <thead>
+                            <tr class="border-b border-gray-100">
+                                <th class="pb-2 text-left font-medium text-neutral"></th>
+                                <th class="pb-2 text-left font-medium text-neutral">本金 2025/10/6</th>
+                                <th class="pb-2 text-left font-medium text-neutral">现值</th>
+                                <th class="pb-2 text-left font-medium text-neutral">收益</th>
+                            </tr>
+                        </thead>
+                        <tbody id="profit-table-body">
+                            <tr class="border-b border-gray-50">
+                                <td class="py-2 font-medium">现金</td>
+                                <td class="py-2">999999999</td>
+                                <td class="py-2">999999999</td>
+                                <td class="py-2 text-success">999999999</td>
+                            </tr>
+                            <tr class="border-b border-gray-50">
+                                <td class="py-2 font-medium">A股</td>
+                                <td class="py-2">999999999</td>
+                                <td class="py-2">999999999</td>
+                                <td class="py-2 text-success">999999999</td>
+                            </tr>
+                            <tr class="border-b border-gray-50">
+                                <td class="py-2 font-medium">债券</td>
+                                <td class="py-2">999999999</td>
+                                <td class="py-2">999999999</td>
+                                <td class="py-2 text-success">999999999</td>
+                            </tr>
+                            <tr class="border-b border-gray-50">
+                                <td class="py-2 font-medium">红利</td>
+                                <td class="py-2">999999999</td>
+                                <td class="py-2">999999999</td>
+                                <td class="py-2 text-success">999999999</td>
+                            </tr>
+                            <tr>
+                                <td class="py-2 font-medium">美股</td>
+                                <td class="py-2">999999999</td>
+                                <td class="py-2">999999999</td>
+                                <td class="py-2 text-success">999999999</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 变化曲线 -->
+            <div class="bg-white rounded-xl p-5 card-shadow transition-all duration-300 hover:shadow-lg">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-semibold text-dark flex items-center">
+                        <i class="fa fa-area-chart text-primary mr-2"></i>变化曲线
+                    </h2>
+                    <div class="flex items-center">
+                        <select id="performance-type-select"
+                            class="px-2 py-1 border border-gray-200 rounded text-sm bg-white input-focus">
+                            <option>加载中...</option>
+                        </select>
+                        <button id="draw-performance-button"
+                            class="ml-2 px-3 py-1 bg-primary text-white rounded-lg hover:bg-primary/90 transition-all duration-300 text-sm">
+                            绘制
+                        </button>
+                    </div>
+                </div>
+
+                <div class="h-80">
+                    <canvas id="performanceChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="bg-white border-t border-gray-100 mt-10 py-6">
+        <div class="container mx-auto px-4 text-center text-sm text-neutral">
+            <p>© 2026 资产收益追踪系统 | 专业的个人资产管理工具</p>
+        </div>
+    </footer>
+
+    <script>
+        // 设置当前日期
+        document.getElementById('current-date').textContent = new Date().toLocaleDateString('zh-CN', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            weekday: 'long'
+        });
+
+        // 初始化变化曲线图表
+        const performanceCtx = document.getElementById('performanceChart').getContext('2d');
+        const performanceChart = new Chart(performanceCtx, {
+            type: 'line',
+            data: {
+                labels: ['2025/12/17', '2026/1/17', '2026/2/17', '2026/3/17'],
+                datasets: [
+                    {
+                        label: '现值',
+                        data: [100000, 120000, 150000, 200000],
+                        borderColor: '#EF4444',
+                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        borderWidth: 3,
+                        tension: 0.3,
+                        fill: false,
+                        pointBackgroundColor: '#EF4444',
+                        pointRadius: 4
+                    },
+                    {
+                        label: '本金',
+                        data: [100000, 110000, 120000, 140000],
+                        borderColor: '#1E293B',
+                        backgroundColor: 'rgba(30, 41, 59, 0.1)',
+                        borderWidth: 3,
+                        tension: 0.3,
+                        fill: false,
+                        pointBackgroundColor: '#1E293B',
+                        pointRadius: 4
+                    },
+                    {
+                        label: '收益',
+                        data: [0, 10000, 30000, 60000],
+                        borderColor: '#F59E0B',
+                        backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                        borderWidth: 3,
+                        tension: 0.3,
+                        fill: false,
+                        pointBackgroundColor: '#F59E0B',
+                        pointRadius: 4
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: {
+                            usePointStyle: true,
+                            boxWidth: 6
+                        }
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                        backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                        titleColor: '#1E293B',
+                        bodyColor: '#64748B',
+                        borderColor: 'rgba(0, 0, 0, 0.1)',
+                        borderWidth: 1,
+                        padding: 10,
+                        boxPadding: 5,
+                        usePointStyle: true,
+                        callbacks: {
+                            label: function (context) {
+                                return `${context.dataset.label}: ${context.raw.toLocaleString('zh-CN')}`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: {
+                            display: false
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function (value) {
+                                return value.toLocaleString('zh-CN');
+                            }
+                        }
+                    }
+                },
+                interaction: {
+                    mode: 'nearest',
+                    axis: 'x',
+                    intersect: false
+                }
+            }
+        });
+
+        // 初始化资产配比图表
+        const allocationCtx = document.getElementById('allocationChart').getContext('2d');
+        const allocationChart = new Chart(allocationCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['现金', 'A股', '债券', '红利', '美股'],
+                datasets: [{
+                    data: [30, 25, 20, 15, 10],
+                    backgroundColor: [
+                        '#3B82F6',
+                        '#10B981',
+                        '#F59E0B',
+                        '#6366F1',
+                        '#EF4444'
+                    ],
+                    borderWidth: 0,
+                    hoverOffset: 5
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '70%',
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            usePointStyle: true,
+                            padding: 15,
+                            boxWidth: 6
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                        titleColor: '#1E293B',
+                        bodyColor: '#64748B',
+                        borderColor: 'rgba(0, 0, 0, 0.1)',
+                        borderWidth: 1,
+                        padding: 10,
+                        callbacks: {
+                            label: function (context) {
+                                return `${context.label}: ${context.raw}%`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', function () {
+            // --- DOM Element References ---
+            const calculateProfitButton = document.getElementById('calculate-profit-button');
+            const startDateInput = document.getElementById('start-date-input');
+            const endDateInput = document.getElementById('end-date-input');
+
+            // --- Auto-set dates and fetch data on load ---
+            const today = new Date();
+            const year = today.getFullYear();
+            const firstDay = new Date(year, 0, 1);
+            const lastDay = new Date(year, 11, 31);
+
+            const formatDate = (date) => {
+                const y = date.getFullYear();
+                const m = String(date.getMonth() + 1).padStart(2, '0');
+                const d = String(date.getDate()).padStart(2, '0');
+                return `${y}-${m}-${d}`;
+            };
+
+            startDateInput.value = formatDate(firstDay);
+            endDateInput.value = formatDate(lastDay);
+            const worthInputsContainer = document.getElementById('worth-inputs-container');
+            const submitWorthButton = document.getElementById('submit-worth-button');
+            const flowTypeSelect = document.getElementById('flow-type-select');
+            const profitTableBody = document.getElementById('profit-table-body');
+            const allocationTypeSelect = document.getElementById('allocation-type-select');
+            const drawAllocationButton = document.getElementById('draw-allocation-button');
+            const performanceTypeSelect = document.getElementById('performance-type-select');
+            const drawPerformanceButton = document.getElementById('draw-performance-button');
+            const flowValueInput = document.getElementById('flow-value-input');
+            const submitFlowButton = document.getElementById('submit-flow-button');
+
+            // --- State ---
+            let assetTypes = []; // To store asset types from enum API
+            let latestProfitData = null; // To cache the last fetched profit data
+
+            // --- Helper Functions ---
+            const formatNumber = (num) => num.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+            // --- Initialization ---
+            fetch('/api/v1/finance/enum/')
+                .then(response => response.json())
+                .then(apiResponse => {
+                    if (apiResponse.code === 200 && Array.isArray(apiResponse.data)) {
+                        assetTypes = apiResponse.data; // Store for later use
+
+                        // Clear loading states
+                        worthInputsContainer.innerHTML = '';
+                        flowTypeSelect.innerHTML = '';
+                        performanceTypeSelect.innerHTML = ''; // Clear loading state for performance chart select
+
+                        // Add "Overall" option to performance chart select
+                        const overallOption = document.createElement('option');
+                        overallOption.value = 'all';
+                        overallOption.textContent = '总体';
+                        performanceTypeSelect.appendChild(overallOption);
+
+                        assetTypes.forEach(item => {
+                            // 1. Populate Worth Inputs
+                            const inputGroup = document.createElement('div');
+                            inputGroup.className = 'flex items-center';
+                            inputGroup.innerHTML = `
+                                <label class="w-20 shrink-0 text-sm font-medium text-neutral">${item.cname}</label>
+                                <input type="text" data-name="${item.name}" class="flex-1 px-3 py-2 border border-gray-200 rounded-lg input-focus text-sm" value="0">
+                            `;
+                            worthInputsContainer.appendChild(inputGroup);
+
+                            // 2. Populate Performance Chart Select
+                            const performanceOption = document.createElement('option');
+                            performanceOption.value = item.name;
+                            performanceOption.textContent = item.cname;
+                            performanceTypeSelect.appendChild(performanceOption);
+
+                            // 3. Populate Flow Type Select
+                            const flowOption = document.createElement('option');
+                            flowOption.value = item.name;
+                            flowOption.textContent = item.cname;
+                            flowTypeSelect.appendChild(flowOption);
+                        });
+                    } else {
+                        worthInputsContainer.innerHTML = '<p class="text-red-500">加载资产类型失败</p>';
+                        console.error('Failed to load enum data:', apiResponse.msg);
+                    }
+                })
+                .catch(error => {
+                    worthInputsContainer.innerHTML = '<p class="text-red-500">请求资产类型错误</p>';
+                    console.error('Error fetching enum data:', error);
+                });
+
+            // --- Event Listeners ---
+
+            // Submit Worth Data
+            submitWorthButton.addEventListener('click', function () {
+                const payload = {};
+                const inputs = worthInputsContainer.querySelectorAll('input[type="text"]');
+                inputs.forEach(input => {
+                    let value = 0;
+                    if (input.value.includes('+')) {
+                        try {
+                            value = input.value.split('+').reduce((a, b) => parseFloat(a.trim()) + parseFloat(b.trim()), 0);
+                        } catch (e) { value = 0; }
+                    } else {
+                        value = parseFloat(input.value.replace(/,/g, '')) || 0;
+                    }
+                    payload[input.dataset.name] = isNaN(value) ? 0 : value;
+                });
+
+                fetch('/api/v1/finance/worth/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        alert(data.code === 200 ? '提交成功！' : `提交失败: ${data.msg || '未知错误'}`);
+                    })
+                    .catch(error => {
+                        alert('提交请求失败，请查看控制台');
+                        console.error('Error submitting worth data:', error);
+                    });
+            });
+
+            // Calculate and Display Profit
+            calculateProfitButton.addEventListener('click', function () {
+                const startDate = startDateInput.value;
+                const endDate = endDateInput.value;
+                if (!startDate || !endDate) {
+                    alert('请选择起始和结束日期');
+                    return;
+                }
+
+                const url = `/api/v1/finance/profit/?start_date=${startDate}&end_date=${endDate}`;
+                profitTableBody.innerHTML = '<tr><td colspan="4" class="py-2 text-center">计算中...</td></tr>';
+
+                fetch(url)
+                    .then(response => response.json())
+                    .then(apiResponse => {
+                        if (apiResponse.code === 200 && apiResponse.data) {
+                            profitTableBody.innerHTML = ''; // Clear loading message
+                            latestProfitData = apiResponse.data; // Cache the data
+
+                            assetTypes.forEach(asset => {
+                                const profitData = latestProfitData; // Use cached data
+                                const assetProfit = profitData[asset.name];
+                                if (assetProfit && Array.isArray(assetProfit)) {
+                                    const [currentValue, principal, profit] = assetProfit;
+                                    const profitClass = profit >= 0 ? 'text-success' : 'text-danger';
+
+                                    const row = document.createElement('tr');
+                                    row.className = 'border-b border-gray-50';
+                                    row.innerHTML = `
+                                        <td class="py-2 font-medium">${asset.cname}</td>
+                                        <td class="py-2">${formatNumber(principal)}</td>
+                                        <td class="py-2">${formatNumber(currentValue)}</td>
+                                        <td class="py-2 ${profitClass}">${formatNumber(profit)}</td>
+                                    `;
+                                    profitTableBody.appendChild(row);
+                                }
+                            });
+
+                            // Automatically draw the allocation chart with default value ('worth')
+                            drawAllocationButton.click();
+
+                            // Automatically draw the performance chart with default value ('all')
+                            drawPerformanceButton.click();
+                        } else {
+                            profitTableBody.innerHTML = `<tr><td colspan="4" class="py-2 text-center text-red-500">${apiResponse.msg || '加载收益数据失败'}</td></tr>`;
+                            console.error('Failed to load profit data:', apiResponse.msg);
+                        }
+                    })
+                    .catch(error => {
+                        profitTableBody.innerHTML = '<tr><td colspan="4" class="py-2 text-center text-red-500">请求收益数据错误</td></tr>';
+                        console.error('Error fetching profit data:', error);
+                    });
+            });
+
+            // --- Allocation Chart Drawing --- 
+            drawAllocationButton.addEventListener('click', function () {
+                if (!latestProfitData) {
+                    alert('请先计算收益数据！');
+                    return;
+                }
+
+                const allocationType = allocationTypeSelect.value;
+                const typeMap = { worth: 0, principal: 1, profit: 2 };
+                const dataIndex = typeMap[allocationType];
+
+                const labels = [];
+                const data = [];
+
+                assetTypes.forEach(asset => {
+                    const assetData = latestProfitData[asset.name];
+                    // Only include non-zero, positive values for the chart
+                    if (assetData && assetData[dataIndex] > 0) {
+                        labels.push(asset.cname);
+                        data.push(assetData[dataIndex]);
+                    }
+                });
+
+                allocationChart.data.labels = labels;
+                allocationChart.data.datasets[0].data = data;
+                allocationChart.update();
+            });
+
+            // --- Performance Chart Drawing ---
+            drawPerformanceButton.addEventListener('click', function () {
+                const startDate = startDateInput.value;
+                const endDate = endDateInput.value;
+                const type = performanceTypeSelect.value;
+
+                if (!startDate || !endDate) {
+                    alert('请选择起始和结束日期');
+                    return;
+                }
+
+                const url = `/api/v1/finance/profit/history/?start_date=${startDate}&end_date=${endDate}&type=${type}`;
+
+                fetch(url)
+                    .then(response => response.json())
+                    .then(apiResponse => {
+                        if (apiResponse.code === 200 && Array.isArray(apiResponse.data)) {
+                            const historyData = apiResponse.data;
+
+                            const labels = historyData.map(d => new Date(d.time).toLocaleDateString('zh-CN', { year: '2-digit', month: '2-digit', day: '2-digit' }));
+                            const worthData = historyData.map(d => d.worth);
+                            const principalData = historyData.map(d => d.principal);
+                            const profitData = historyData.map(d => d.profit);
+
+                            performanceChart.data.labels = labels;
+                            performanceChart.data.datasets[0].data = worthData;
+                            performanceChart.data.datasets[1].data = principalData;
+                            performanceChart.data.datasets[2].data = profitData;
+                            performanceChart.update();
+
+                        } else {
+                            alert(`加载历史数据失败: ${apiResponse.msg || '未知错误'}`);
+                            console.error('Failed to load history data:', apiResponse.msg);
+                        }
+                    })
+                    .catch(error => {
+                        alert('请求历史数据错误，请查看控制台');
+                        console.error('Error fetching history data:', error);
+                    });
+            });
+
+            // --- Flow Record Submission ---
+            submitFlowButton.addEventListener('click', function () {
+                const type = flowTypeSelect.value;
+                const value = parseFloat(flowValueInput.value);
+
+                if (!type || isNaN(value)) {
+                    alert('请选择类型并输入有效的金额');
+                    return;
+                }
+
+                const payload = {
+                    type: type,
+                    value: value
+                };
+
+                fetch('/api/v1/finance/flow-record/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.code === 200) {
+                            alert('资金流动记录提交成功！');
+                            flowValueInput.value = ''; // Clear input on success
+                        } else {
+                            alert(`提交失败: ${data.msg || '未知错误'}`);
+                        }
+                    })
+                    .catch(error => {
+                        alert('提交请求失败，请查看控制台');
+                        console.error('Error submitting flow record:', error);
+                    });
+            });
+
+            // Automatically trigger calculation on page load
+            calculateProfitButton.click();
+        });
+    </script>
+</body>
+
+</html>
