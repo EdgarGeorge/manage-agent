@@ -38,6 +38,13 @@ func getExeDir() string {
 	if exeDir != "" {
 		return exeDir
 	}
+
+	// Android 环境：使用环境变量指定的数据目录
+	if androidDataDir := os.Getenv("ANDROID_DATA_DIR"); androidDataDir != "" {
+		exeDir = androidDataDir
+		return exeDir
+	}
+
 	exe, err := os.Executable()
 	if err != nil {
 		// 如果获取失败，使用当前工作目录
