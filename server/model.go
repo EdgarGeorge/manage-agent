@@ -20,9 +20,10 @@ type WorthModel struct {
 
 // FlowRecordModel 资金流动记录表
 type FlowRecordModel struct {
-	Time  string  `gorm:"column:time;type:varchar(100);comment:时间" json:"time"`
-	Type  string  `gorm:"column:type;type:varchar(100);comment:类型" json:"type"`
-	Value float64 `gorm:"column:value;type:decimal(12,2);comment:金额" json:"value"`
+	gorm.Model         // 内置模型结构体，包含 ID、CreatedAt、UpdatedAt、DeletedAt 字段
+	Time       string  `gorm:"column:time;type:varchar(100);comment:时间" json:"time"`
+	Type       string  `gorm:"column:type;type:varchar(100);comment:类型" json:"type"`
+	Value      float64 `gorm:"column:value;type:decimal(12,2);comment:金额" json:"value"`
 }
 
 func (w WorthModel) Create() error {
@@ -39,6 +40,15 @@ func (f FlowRecordModel) Create() error {
 		return result.Error
 	}
 	return nil
+}
+
+func (f FlowRecordModel) CreateInBatch(records []FlowRecordModel) error {
+	return Mysql.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&records).Error; err != nil {
+			return err
+		}
+		return nil
+	})
 }
 
 func (w WorthModel) GetLatestWorth() (*WorthModel, error) {

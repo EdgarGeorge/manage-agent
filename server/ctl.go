@@ -234,7 +234,7 @@ func QueryHistoryProfit(c *gin.Context) ([]map[string]any, error) {
 }
 
 type WorthJSON struct {
-	Time   string  `json:"-"`       // 现值时刻
+	Time   string  `json:"time"`    // 现值时刻
 	Cash   float64 `json:"cash"`    // 现金
 	StockA float64 `json:"stock_a"` // A股
 	StockM float64 `json:"stock_m"` // M股
@@ -249,8 +249,12 @@ func CreateWorthCtl(c *gin.Context) error {
 		return err
 	}
 
-	loc, _ := time.LoadLocation("Asia/Shanghai")
-	currentTime := time.Now().In(loc).Format("2006-01-02 15:04:05")
+	currentTime := worthJson.Time
+	if currentTime == "" {
+		loc, _ := time.LoadLocation("Asia/Shanghai")
+		currentTime = time.Now().In(loc).Format("2006-01-02 15:04:05")
+	}
+
 	worthModel := WorthModel{
 		Time:   currentTime,
 		Cash:   worthJson.Cash,
@@ -268,7 +272,7 @@ func CreateWorthCtl(c *gin.Context) error {
 }
 
 type FlowRecordJson struct {
-	Time  string  `json:"-"`
+	Time  string  `json:"time"`
 	Type  string  `json:"type"`
 	Value float64 `json:"value"`
 }
@@ -278,41 +282,70 @@ func CreateFlowRecordCtl(c *gin.Context) error {
 	if err := c.ShouldBindJSON(&flowRecordJson); err != nil {
 		return err
 	}
-	var worthModel WorthModel
-	lastWorth, err := worthModel.GetLatestWorth()
-	if err != nil {
-		return err
+	// var worthModel WorthModel
+	// lastWorth, err := worthModel.GetLatestWorth()
+	// if err != nil {
+	// 	return err
+	// }
+
+	// worth := 0.0
+
+	// switch flowRecordJson.Type {
+	// case "cash":
+	// 	worth = lastWorth.Cash
+	// case "stock_a":
+	// 	worth = lastWorth.StockA
+	// case "stock_m":
+	// 	worth = lastWorth.StockM
+	// case "hongli":
+	// 	worth = lastWorth.Hongli
+	// case "bond":
+	// 	worth = lastWorth.Bond
+	// case "debt":
+	// 	worth = lastWorth.Debt
+	// }
+
+	currentTime := flowRecordJson.Time
+	if currentTime == "" {
+		loc, _ := time.LoadLocation("Asia/Shanghai")
+		currentTime = time.Now().In(loc).Format("2006-01-02 15:04:05")
 	}
 
-	worth := 0.0
-
+	modelList := []FlowRecordModel{}
 	switch flowRecordJson.Type {
 	case "cash":
-		worth = lastWorth.Cash
-	case "stock_a":
-		worth = lastWorth.StockA
-	case "stock_m":
-		worth = lastWorth.StockM
-	case "hongli":
-		worth = lastWorth.Hongli
-	case "bond":
-		worth = lastWorth.Bond
-	case "debt":
-		worth = lastWorth.Debt
+		// ?? 不支持批量变动，导致数据校验出错
+		// if worth+flowRecordJson.Value < 0 {
+		// 	return fmt.Errorf("现值不能为负，%s 当前值 %f, 变化值 %f", flowRecordJson.Type, worth, flowRecordJson.Value)
+		// }
+		modelList = append(modelList, FlowRecordModel{
+			Time:  currentTime,
+			Type:  flowRecordJson.Type,
+			Value: flowRecordJson.Value,
+		})
+
+	case "stock_a", "stock_m", "hongli", "bond", "debt":
+
+		// if worth+flowRecordJson.Value < 0 {
+		// 	return fmt.Errorf("现值不能为负，%s 当前值 %f, 变化值 %f", flowRecordJson.Type, worth, flowRecordJson.Value)
+		// }
+		// if lastWorth.Cash-flowRecordJson.Value < 0 {
+		// 	return fmt.Errorf("现值不能为负，%s 当前值 %f, 变化值 %f", flowRecordJson.Type, lastWorth.Cash, -flowRecordJson.Value)
+		// }
+		modelList = append(modelList, FlowRecordModel{
+			Time:  currentTime,
+			Type:  flowRecordJson.Type,
+			Value: flowRecordJson.Value,
+		})
+		modelList = append(modelList, FlowRecordModel{
+			Time:  currentTime,
+			Type:  "cash",
+			Value: -flowRecordJson.Value,
+		})
 	}
 
-	if worth+flowRecordJson.Value < 0 {
-		return fmt.Errorf("现值不能为负，%s 当前值 %f, 变化值 %f", flowRecordJson.Type, worth, flowRecordJson.Value)
-	}
-
-	loc, _ := time.LoadLocation("Asia/Shanghai")
-	currentTime := time.Now().In(loc).Format("2006-01-02 15:04:05")
-	flowRecordModel := FlowRecordModel{
-		Time:  currentTime,
-		Type:  flowRecordJson.Type,
-		Value: flowRecordJson.Value,
-	}
-	if err := flowRecordModel.Create(); err != nil {
+	flowRecordModel := FlowRecordModel{}
+	if err := flowRecordModel.CreateInBatch(modelList); err != nil {
 		return err
 	}
 	return nil

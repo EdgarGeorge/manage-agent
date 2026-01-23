@@ -148,7 +148,10 @@ func main() {
 	r.Use(server.PanicRecoverMiddleware())
 
 	// 加载 HTML 模板文件
-	r.LoadHTMLGlob("html/*")
+	r.LoadHTMLGlob("html/index.html")
+	r.Static("/assets", "./html/assets")
+	// 前端 API 脚本改用独立前缀，避免与后端 /api 路由冲突
+	r.Static("/static/api", "./html/api")
 
 	// 路由注册
 	api := r.Group("/api/v1")
