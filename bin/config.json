@@ -1,9 +1,8 @@
 {
-    "mysql": {
-        "username": "root",
-        "password": "root",
-        "host": "127.0.0.1",
-        "port": "3306",
-        "schema": "manage-agent"
+    "database": {
+        "type": "sqlite",
+        "sqlite": {
+            "path": "./data/manage-agent.db"
+        }
     }
 }

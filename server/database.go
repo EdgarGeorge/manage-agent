@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/glebarez/sqlite"
 	_ "github.com/go-sql-driver/mysql"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -20,12 +22,23 @@ const (
 	DefaultMySQLPort     = "3306"
 
 	DefaultSchema = "manage-agent"
+
+	DefaultSQLitePath = "./data/manage-agent.db"
 )
 
 var (
 	Mysql *gorm.DB
 )
 
+// DatabaseType 表示数据库类型
+type DatabaseType string
+
+const (
+	DBTypeMySQL  DatabaseType = "mysql"
+	DBTypeSQLite DatabaseType = "sqlite"
+)
+
+// MySQLConfig MySQL 配置
 type MySQLConfig struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
@@ -34,6 +47,19 @@ type MySQLConfig struct {
 	Schema   string `json:"schema"`
 }
 
+// SQLiteConfig SQLite 配置
+type SQLiteConfig struct {
+	Path string `json:"path"`
+}
+
+// DatabaseConfig 通用数据库配置
+type DatabaseConfig struct {
+	Type   DatabaseType  `json:"type"`
+	MySQL  *MySQLConfig  `json:"mysql,omitempty"`
+	SQLite *SQLiteConfig `json:"sqlite,omitempty"`
+}
+
+// NewDefaultMysqlConfig 保留给云端或 MySQL 场景使用
 func NewDefaultMysqlConfig() *MySQLConfig {
 	return &MySQLConfig{
 		Username: DefaultMysqlUsername,
@@ -44,6 +70,71 @@ func NewDefaultMysqlConfig() *MySQLConfig {
 	}
 }
 
+// NewDefaultDatabaseConfig 默认使用本地 SQLite
+func NewDefaultDatabaseConfig() *DatabaseConfig {
+	return &DatabaseConfig{
+		Type: DBTypeSQLite,
+		SQLite: &SQLiteConfig{
+			Path: DefaultSQLitePath,
+		},
+	}
+}
+
+// InitDatabase 根据配置初始化数据库连接
+func InitDatabase(cfg *DatabaseConfig) error {
+	if cfg == nil {
+		cfg = NewDefaultDatabaseConfig()
+	}
+
+	switch cfg.Type {
+	case DBTypeMySQL:
+		if cfg.MySQL == nil {
+			cfg.MySQL = NewDefaultMysqlConfig()
+		}
+		return MysqlConnect(*cfg.MySQL)
+	case DBTypeSQLite, "":
+		// 默认使用 SQLite
+		return InitSQLite(cfg.SQLite)
+	default:
+		return fmt.Errorf("不支持的数据库类型: %s", cfg.Type)
+	}
+}
+
+// InitSQLite 初始化 SQLite 数据库（本地文件）
+func InitSQLite(cfg *SQLiteConfig) error {
+	path := DefaultSQLitePath
+	if cfg != nil && cfg.Path != "" {
+		path = cfg.Path
+	}
+
+	// 确保目录存在
+	if err := os.MkdirAll(filepath.Dir(path), os.ModePerm); err != nil {
+		return fmt.Errorf("创建数据库目录失败: %w", err)
+	}
+
+	newLogger := mlogger.New(
+		log.New(os.Stdout, "\r\n", log.LstdFlags),
+		mlogger.Config{
+			SlowThreshold:             time.Second,
+			LogLevel:                  mlogger.Silent,
+			IgnoreRecordNotFoundError: true,
+			Colorful:                  true,
+		},
+	)
+
+	db, err := gorm.Open(sqlite.Open(path),
+		&gorm.Config{
+			Logger: newLogger,
+		})
+	if err != nil {
+		return fmt.Errorf("打开 SQLite 数据库失败: %w", err)
+	}
+
+	Mysql = db
+	return nil
+}
+
+// DBConnect 兼容旧接口，仍然连接 MySQL
 func DBConnect(db MySQLConfig) error {
 	if err := MysqlConnect(db); err != nil {
 		return err
@@ -51,8 +142,9 @@ func DBConnect(db MySQLConfig) error {
 	return nil
 }
 
+// MysqlConnect 初始化 MySQL 连接
 func MysqlConnect(db MySQLConfig) error {
-	//初始化mysql连接
+	// 初始化 mysql 连接
 	dsn := strings.Join([]string{db.Username, ":", db.Password, "@tcp(", db.Host, ":", db.Port, ")/", db.Schema, "?charset=utf8&parseTime=True&loc=Asia%2FShanghai"}, "")
 	err := NewMySQLPool(dsn)
 	if err != nil {
@@ -61,6 +153,7 @@ func MysqlConnect(db MySQLConfig) error {
 	return nil
 }
 
+// NewMySQLPool 创建 MySQL 连接池
 func NewMySQLPool(dsn string) error {
 	fmt.Println("Mysql DSN: ", dsn)
 
@@ -81,17 +174,7 @@ func NewMySQLPool(dsn string) error {
 	if err != nil {
 		return err
 	}
-	// //设置连接的最长生命周期
-	// db.SetConnMaxLifetime(time.Minute * 10)
-	// //设置数据库最大闲置连接数
-	// db.SetMaxIdleConns(100)
-	// //设置最大打开的连接数
-	// db.SetMaxOpenConns(100)
 
-	// err = db.Ping()
-	// if err != nil {
-	// 	panic(err)
-	// }
 	Mysql = db
 	return nil
 }

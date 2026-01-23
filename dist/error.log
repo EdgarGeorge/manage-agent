@@ -1,0 +1,2 @@
+[2026-01-23 22:27:21] 配置文件加载失败: 加载配置文件失败: open C:\workplace\manage-agent\dist\config.json: The system cannot find the file specified.
+配置文件路径: C:\workplace\manage-agent\dist\config.json

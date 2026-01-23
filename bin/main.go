@@ -1,8 +1,11 @@
 package main
 
 import (
+	"embed"
 	"encoding/json"
 	"flag"
+	"fmt"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
@@ -21,19 +24,58 @@ import (
 	_ "net/http/pprof"
 )
 
+//go:embed html
+var htmlFiles embed.FS
+
 var (
 	configFile string
 	logger     *logrus.Logger
+	exeDir     string // exe 文件所在目录
 )
 
+// getExeDir 获取可执行文件所在目录
+func getExeDir() string {
+	if exeDir != "" {
+		return exeDir
+	}
+	exe, err := os.Executable()
+	if err != nil {
+		// 如果获取失败，使用当前工作目录
+		exeDir, _ = os.Getwd()
+		return exeDir
+	}
+	exeDir = filepath.Dir(exe)
+	return exeDir
+}
+
+// showError 显示错误信息并写入日志文件
+func showError(title, message string) {
+	// 写入错误日志文件
+	errorLogPath := filepath.Join(getExeDir(), "error.log")
+	if f, err := os.OpenFile(errorLogPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
+		fmt.Fprintf(f, "[%s] %s: %s\n", time.Now().Format("2006-01-02 15:04:05"), title, message)
+		f.Close()
+	}
+	// 同时输出到标准错误（如果有控制台）
+	fmt.Fprintf(os.Stderr, "[%s] %s: %s\n", time.Now().Format("2006-01-02 15:04:05"), title, message)
+}
+
 func InitLogging() {
+	// 使用相对于 exe 目录的日志路径
+	logDir := filepath.Join(getExeDir(), "log")
+	if err := os.MkdirAll(logDir, os.ModePerm); err != nil {
+		showError("日志目录创建失败", err.Error())
+		logrus.Fatalf("配置日志文件失败: %v", err)
+	}
+
 	logFile, err := rotatelogs.New(
-		"../log/log-%Y%m%d.json",
-		rotatelogs.WithLinkName("../log/latest.json"),
+		filepath.Join(logDir, "log-%Y%m%d.json"),
+		rotatelogs.WithLinkName(filepath.Join(logDir, "latest.json")),
 		rotatelogs.WithMaxAge(7*24*time.Hour),
 		rotatelogs.WithRotationTime(24*time.Hour),
 	)
 	if err != nil {
+		showError("日志文件配置失败", err.Error())
 		logrus.Fatalf("配置日志文件失败: %v", err)
 	}
 
@@ -68,7 +110,7 @@ func DBAutoMigrate() error {
 }
 
 type Config struct {
-	Mysql *server.MySQLConfig `json:"mysql"`
+	Database *server.DatabaseConfig `json:"database"`
 }
 
 func init() {
@@ -88,7 +130,7 @@ func InitDB(config *Config) error {
 
 func NewDefaultConfig() *Config {
 	return &Config{
-		Mysql: server.NewDefaultMysqlConfig(),
+		Database: server.NewDefaultDatabaseConfig(),
 	}
 }
 
@@ -121,19 +163,45 @@ func main() {
 	// 解析启动参数, eg. .\main -c .\config.json
 	flag.Parse()
 
-	// 加载配置文件
-	config, err := LoadConfigFromFile("./config.json")
+	// 获取 exe 目录
+	exeDir = getExeDir()
+
+	// 加载配置文件（使用相对于 exe 目录的路径）
+	configPath := filepath.Join(exeDir, "config.json")
+	if configFile != "" {
+		configPath = configFile
+	}
+	config, err := LoadConfigFromFile(configPath)
 	log.Printf("config:%v", config)
 	if err != nil {
-		panic("load config fail. err:" + err.Error())
+		errorMsg := fmt.Sprintf("加载配置文件失败: %s\n配置文件路径: %s", err.Error(), configPath)
+		showError("配置文件加载失败", errorMsg)
+		// 如果配置文件不存在，使用默认配置
+		if os.IsNotExist(err) {
+			log.Printf("配置文件不存在，使用默认配置")
+			config = NewDefaultConfig()
+		} else {
+			panic("load config fail. err:" + err.Error())
+		}
 	}
 
-	// 初始化DB
-	if err := server.DBConnect(*config.Mysql); err != nil {
-		panic("connect db fail. err:" + err.Error())
+	// 如果配置中的路径是相对路径，转换为相对于 exe 目录的绝对路径
+	if config.Database != nil && config.Database.SQLite != nil && config.Database.SQLite.Path != "" {
+		if !filepath.IsAbs(config.Database.SQLite.Path) {
+			config.Database.SQLite.Path = filepath.Join(exeDir, config.Database.SQLite.Path)
+		}
+	}
+
+	// 初始化数据库（本地默认使用 SQLite）
+	if err := server.InitDatabase(config.Database); err != nil {
+		errorMsg := fmt.Sprintf("初始化数据库失败: %s", err.Error())
+		showError("数据库初始化失败", errorMsg)
+		panic("init database fail. err:" + err.Error())
 	}
 
 	if err := InitDB(config); err != nil {
+		errorMsg := fmt.Sprintf("数据库建表失败: %s", err.Error())
+		showError("数据库建表失败", errorMsg)
 		panic("init db fail. err:" + err.Error())
 	}
 
@@ -147,23 +215,39 @@ func main() {
 	r.Use(server.RequestRecordMiddleware())
 	r.Use(server.PanicRecoverMiddleware())
 
-	// 加载 HTML 模板文件
-	r.LoadHTMLGlob("html/index.html")
-	r.Static("/assets", "./html/assets")
-	// 前端 API 脚本改用独立前缀，避免与后端 /api 路由冲突
-	r.Static("/static/api", "./html/api")
+	// 从嵌入的文件系统加载前端资源
+	htmlFS, err := fs.Sub(htmlFiles, "html")
+	if err != nil {
+		panic("加载前端资源失败: " + err.Error())
+	}
+
+	// 加载 HTML 模板
+	r.LoadHTMLFS(http.FS(htmlFS), "index.html")
+
+	// 静态资源：assets 目录
+	assetsFS, err := fs.Sub(htmlFS, "assets")
+	if err != nil {
+		panic("加载 assets 资源失败: " + err.Error())
+	}
+	r.StaticFS("/assets", http.FS(assetsFS))
+
+	// 静态资源：api 目录
+	apiFS, err := fs.Sub(htmlFS, "api")
+	if err != nil {
+		panic("加载 api 资源失败: " + err.Error())
+	}
+	r.StaticFS("/static/api", http.FS(apiFS))
 
 	// 路由注册
 	api := r.Group("/api/v1")
 	{
 		server.RegisterFinanceRouter(api)
-
 	}
 
-	// 托管静态文件（index.html放在项目根目录文件夹下）
-	r.StaticFile("/", "html/index.html")
-	// 如果有其他静态资源（如js/css），需同步托管
-	// r.Static("/static", "./static")
+	// 根路径：渲染 index.html
+	r.GET("/", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "index.html", nil)
+	})
 
 	// 程序启动后自动打开浏览器
 	go func() {
