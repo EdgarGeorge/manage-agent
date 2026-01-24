@@ -142,6 +142,8 @@ func main() {
 	api := r.Group("/api/v1")
 	{
 		server.RegisterFinanceRouter(api)
+		// 注册同步路由（云端特有）
+		server.RegisterSyncRouter(api)
 	}
 
 	// 404 处理

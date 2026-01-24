@@ -1,5 +1,12 @@
 #!/bin/bash
 # Linux/Mac 构建脚本
+# 使用方法：在项目根目录运行 ./scripts/build.sh
+
+# 检查是否在项目根目录
+if [ ! -f "go.mod" ] || [ ! -d "bin" ]; then
+    echo "错误：请在项目根目录运行此脚本"
+    exit 1
+fi
 
 echo "正在构建 manage-agent..."
 

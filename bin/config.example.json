@@ -1,0 +1,13 @@
+{
+    "database": {
+        "type": "sqlite",
+        "sqlite": {
+            "path": "./data/manage-agent.db"
+        }
+    },
+    "sync": {
+        "enabled": false,
+        "cloud_api_url": "http://your-server:8080",
+        "auto_sync_interval": 300
+    }
+}

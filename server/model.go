@@ -16,6 +16,8 @@ type WorthModel struct {
 	Hongli     float64 `gorm:"column:hongli; type:decimal(12,2); comment:红利"`
 	Bond       float64 `gorm:"column:bond; type:decimal(12,2); comment:债券"`
 	Debt       float64 `gorm:"column:debt; type:decimal(12,2); comment:债权"`
+	// 同步相关字段（用于数据同步）
+	SyncStatus int `gorm:"column:sync_status; type:int; default:0; comment:同步状态 0-未同步 1-已同步" json:"sync_status,omitempty"`
 }
 
 // FlowRecordModel 资金流动记录表
@@ -24,6 +26,8 @@ type FlowRecordModel struct {
 	Time       string  `gorm:"column:time;type:varchar(100);comment:时间" json:"time"`
 	Type       string  `gorm:"column:type;type:varchar(100);comment:类型" json:"type"`
 	Value      float64 `gorm:"column:value;type:decimal(12,2);comment:金额" json:"value"`
+	// 同步相关字段（用于数据同步）
+	SyncStatus int `gorm:"column:sync_status; type:int; default:0; comment:同步状态 0-未同步 1-已同步" json:"sync_status,omitempty"`
 }
 
 func (w WorthModel) Create() error {
@@ -43,6 +47,10 @@ func (f FlowRecordModel) Create() error {
 }
 
 func (f FlowRecordModel) CreateInBatch(records []FlowRecordModel) error {
+	// 确保所有记录的同步状态为未同步
+	for i := range records {
+		records[i].SyncStatus = 0
+	}
 	return Mysql.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(&records).Error; err != nil {
 			return err

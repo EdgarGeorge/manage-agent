@@ -1,4 +1,4 @@
-# 打包构建说明
+# 构建说明
 
 ## 快速开始
 
@@ -7,7 +7,7 @@
 直接运行构建脚本：
 
 ```bash
-build.bat
+scripts\build.bat
 ```
 
 或者手动构建：
@@ -24,8 +24,8 @@ go build -ldflags="-s -w" -o manage-agent-32.exe bin/main.go
 ### Linux/Mac 系统
 
 ```bash
-chmod +x build.sh
-./build.sh
+chmod +x scripts/build.sh
+./scripts/build.sh
 ```
 
 或者手动构建：
@@ -94,10 +94,10 @@ log/                     # 日志目录（程序自动创建）
 
 ```bash
 # Windows
-build.bat
+scripts\build.bat
 
 # Linux/Mac
-./build.sh
+./scripts/build.sh
 ```
 
 ### 2. 准备配置文件（可选）
@@ -160,6 +160,23 @@ upx --best manage-agent.exe
 
 **注意**：UPX 压缩后，某些杀毒软件可能会误报，需要添加白名单。
 
+## 构建云端服务器
+
+云端版本（使用 MySQL）的构建方式相同：
+
+```bash
+# 使用脚本构建
+./scripts/build-cloud.sh   # Linux/Mac
+scripts\build-cloud.bat     # Windows
+
+# 或手动构建
+go build -ldflags="-s -w" -o manage-agent-cloud cloud/main.go
+```
+
+云端版本只需要：
+- `manage-agent-cloud`（可执行文件）
+- `cloud/cloud-config.json`（配置文件）
+
 ## 常见问题
 
 ### Q: 为什么可执行文件这么大？
@@ -186,16 +203,3 @@ A: 可以，但需要修改代码：
 1. 移除 `embed` 指令
 2. 使用文件系统路径加载资源
 3. 分发时需要同时包含 `html/` 目录
-
-## 构建云端版本
-
-云端版本（使用 MySQL）的构建方式相同：
-
-```bash
-# 构建云端服务器
-go build -ldflags="-s -w" -o manage-agent-cloud cloud/main.go
-```
-
-云端版本只需要：
-- `manage-agent-cloud`（可执行文件）
-- `cloud-config.json`（配置文件）

@@ -118,6 +118,14 @@ func DBAutoMigrate() error {
 
 type Config struct {
 	Database *server.DatabaseConfig `json:"database"`
+	Sync     *SyncConfig            `json:"sync,omitempty"`
+}
+
+// SyncConfig 同步配置
+type SyncConfig struct {
+	Enabled          bool   `json:"enabled"`            // 是否启用同步
+	CloudAPIURL      string `json:"cloud_api_url"`      // 云端API地址，例如 "http://your-server.com:8080"
+	AutoSyncInterval int    `json:"auto_sync_interval"` // 自动同步间隔（秒），0表示不自动同步
 }
 
 func init() {
@@ -138,6 +146,11 @@ func InitDB(config *Config) error {
 func NewDefaultConfig() *Config {
 	return &Config{
 		Database: server.NewDefaultDatabaseConfig(),
+		Sync: &SyncConfig{
+			Enabled:          false,
+			CloudAPIURL:      "",
+			AutoSyncInterval: 0,
+		},
 	}
 }
 
@@ -215,6 +228,11 @@ func main() {
 	// 初始化日志
 	InitLogging()
 
+	// 启动自动同步（如果启用）
+	if config.Sync != nil && config.Sync.Enabled && config.Sync.CloudAPIURL != "" {
+		StartAutoSync(config.Sync)
+	}
+
 	// 启动Server
 	r := gin.Default()
 
@@ -288,4 +306,31 @@ func main() {
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		panic("run server fail. err:" + err.Error())
 	}
+}
+
+// StartAutoSync 启动自动同步
+func StartAutoSync(syncConfig *SyncConfig) {
+	if syncConfig.AutoSyncInterval <= 0 {
+		return
+	}
+
+	syncClient := server.NewSyncClient(syncConfig.CloudAPIURL)
+	if syncClient == nil {
+		logger.Warn("同步客户端初始化失败，自动同步未启动")
+		return
+	}
+
+	interval := time.Duration(syncConfig.AutoSyncInterval) * time.Second
+	ticker := time.NewTicker(interval)
+
+	go func() {
+		logger.Infof("自动同步已启动，间隔: %v", interval)
+		for range ticker.C {
+			if err := syncClient.FullSync(); err != nil {
+				logger.Errorf("自动同步失败: %v", err)
+			} else {
+				logger.Info("自动同步成功")
+			}
+		}
+	}()
 }

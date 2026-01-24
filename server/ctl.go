@@ -256,13 +256,14 @@ func CreateWorthCtl(c *gin.Context) error {
 	}
 
 	worthModel := WorthModel{
-		Time:   currentTime,
-		Cash:   worthJson.Cash,
-		StockA: worthJson.StockA,
-		StockM: worthJson.StockM,
-		Hongli: worthJson.Hongli,
-		Bond:   worthJson.Bond,
-		Debt:   worthJson.Debt,
+		Time:       currentTime,
+		Cash:       worthJson.Cash,
+		StockA:     worthJson.StockA,
+		StockM:     worthJson.StockM,
+		Hongli:     worthJson.Hongli,
+		Bond:       worthJson.Bond,
+		Debt:       worthJson.Debt,
+		SyncStatus: 0, // 新创建的数据默认为未同步
 	}
 	if err := worthModel.Create(); err != nil {
 		return err
