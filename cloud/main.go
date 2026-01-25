@@ -89,8 +89,11 @@ func InitLogging() {
 func DBAutoMigrateCloud() error {
 	err := server.Mysql.AutoMigrate(
 		&server.RequestRecordModel{},
-		&server.WorthModel{},
+		&server.FTypeModel{},     // 资金类型表
+		&server.WorthModel{},     // 现值主表
+		&server.TypeWorthModel{}, // 各类型价值表
 		&server.FlowRecordModel{},
+		&server.SyncMetadataModel{},
 	)
 	if err != nil {
 		logrus.Fatalf("DB AutoMigrate fail. err:%v", err)
@@ -125,6 +128,12 @@ func main() {
 	// 建表
 	if err := DBAutoMigrateCloud(); err != nil {
 		panic("init cloud db fail. err:" + err.Error())
+	}
+
+	// 初始化默认资金类型（确保 cash 类型存在）
+	if err := server.InitDefaultTypes(); err != nil {
+		logrus.Warnf("初始化默认资金类型失败: %v", err)
+		// 不返回错误，允许应用继续运行
 	}
 
 	// 初始化日志

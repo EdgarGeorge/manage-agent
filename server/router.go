@@ -10,11 +10,15 @@ func RegisterFinanceRouter(r *gin.RouterGroup) {
 		// 利润相关
 		financeGroup.GET("/profit/", QyeryProfitView)
 		financeGroup.GET("/profit/history/", QueryHistoryProfitView)
-		financeGroup.GET("/enum/", FEnumView)
 		// 现值记录
 		financeGroup.POST("/worth/", CreateWorthView)
 		// 流水记录
 		financeGroup.POST("/flow-record/", CreateFlowRecordView)
+		// 资金类型管理（统一使用 enum 接口获取列表，ftype 接口用于增删改）
+		financeGroup.GET("/enum/", FEnumView)
+		financeGroup.POST("/ftype/", CreateFTypeView)
+		financeGroup.PUT("/ftype/:id", UpdateFTypeView)
+		financeGroup.DELETE("/ftype/:id", DeleteFTypeView)
 	}
 }
 

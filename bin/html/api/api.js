@@ -1,7 +1,7 @@
 const API_BASE = '/api/v1/finance';
 
 const api = {
-    // 获取资产类型
+    // 获取资产类型（使用 enum 接口）
     fetchAssetTypes: async () => {
         const res = await fetch(`${API_BASE}/enum/`);
         return res.json();
@@ -38,6 +38,31 @@ const api = {
     fetchHistory: async (startDate, endDate, type) => {
         const url = `${API_BASE}/profit/history/?start_date=${startDate}&end_date=${endDate}&type=${type}`;
         const res = await fetch(url);
+        return res.json();
+    },
+
+    // 资金类型管理相关接口
+    // 获取所有资金类型（使用 enum 接口，与 fetchAssetTypes 相同）
+    fetchTypes: async () => {
+        const res = await fetch(`${API_BASE}/enum/`);
+        return res.json();
+    },
+
+    // 创建资金类型
+    createType: async (data) => {
+        const res = await fetch(`${API_BASE}/ftype/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        return res.json();
+    },
+
+    // 删除资金类型
+    deleteType: async (id) => {
+        const res = await fetch(`${API_BASE}/ftype/${id}`, {
+            method: 'DELETE'
+        });
         return res.json();
     }
 };

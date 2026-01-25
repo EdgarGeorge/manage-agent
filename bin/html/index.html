@@ -53,8 +53,10 @@
                 <h2 class="text-lg font-semibold mb-4 text-dark flex items-center">
                     <i class="fa fa-exchange text-primary mr-2"></i>资金流动记录
                 </h2>
-                <p class="text-xs text-neutral mb-4">输入资金流动信息后需要接着输入当前市值才能获取最新收益情况 <span
-                        class="text-xs font-medium">正负号表示流动方向</span></p>
+                <p class="text-xs text-neutral mb-4">
+                    点击理财, 修改理财项目<br>
+                    外部资金首先流入到现金, 再从现金到各理财项目<br>
+                    输入资金流动信息后需要接着输入当前市值才能获取最新收益情况<br> <span class="text-xs font-medium">正号表示流入, 负号表示流出</span></p>
 
                 <div class="flex-1 flex flex-col justify-between gap-5">
                     <!-- 示意：三枚圆圈放在上方（在独立区域内上下居中） -->
@@ -79,10 +81,10 @@
                             <i class="fa fa-exchange text-primary text-4xl opacity-70"></i>
 
                             <div class="text-center">
-                                <div
-                                    class="w-24 h-24 bg-gradient-to-br from-gray-100 to-gray-50 rounded-full flex items-center justify-center mx-auto">
-                                    <span class="text-xl font-medium text-neutral">理财</span>
-                                </div>
+                                <button id="manage-types-button"
+                                    class="w-24 h-24 bg-gradient-to-br from-blue-50 to-blue-100 rounded-full flex items-center justify-center mx-auto hover:from-blue-100 hover:to-blue-200 transition-all duration-300 cursor-pointer border-2 border-blue-300 hover:border-blue-400 shadow-md hover:shadow-lg active:scale-95">
+                                    <span class="text-xl font-semibold text-blue-700">理财</span>
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -172,9 +174,8 @@
                 <p class="text-xs text-neutral mb-4">
                     起始计算日：将现值设置为本金的日期，也就是开始算账的起始日期<br>
                     本金变动通过流动信息叠加起始本金动态计算<br>
-                    现值：可指定日期展示<br>
-                    本金日期 &lt; 现值日期的最大日期<br>
-                    绘图以现值历史日期为横刻度
+                    计算本金的截止日期 &lt; 现值日期<br>
+                    绘图以现值日期为横刻度
                 </p>
 
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4 items-center">
@@ -248,6 +249,72 @@
             <p>© 2026 资产收益追踪系统 | 专业的个人资产管理工具</p>
         </div>
     </footer>
+
+    <!-- 资金类型管理模态框 -->
+    <div id="types-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 max-h-[80vh] flex flex-col">
+            <!-- 模态框头部 -->
+            <div class="flex items-center justify-between p-5 border-b border-gray-200">
+                <h3 class="text-lg font-semibold text-dark flex items-center">
+                    <i class="fa fa-cog text-primary mr-2"></i>资金类型管理
+                </h3>
+                <button id="close-types-modal" class="text-neutral hover:text-dark transition-colors">
+                    <i class="fa fa-times text-xl"></i>
+                </button>
+            </div>
+
+            <!-- 模态框内容 -->
+            <div class="flex-1 overflow-y-auto p-5">
+                <div id="types-list" class="space-y-3">
+                    <!-- 资金类型列表将动态加载到这里 -->
+                </div>
+
+                <!-- 新增区域 -->
+                <div id="add-type-form" class="mt-4 pt-4 border-t border-gray-200 hidden">
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-sm font-medium text-neutral mb-1">中文名称</label>
+                            <input type="text" id="new-type-cname"
+                                class="w-full px-3 py-2 border border-gray-200 rounded-lg input-focus text-sm"
+                                placeholder="例如：股票">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-neutral mb-1">英文名称</label>
+                            <input type="text" id="new-type-name"
+                                class="w-full px-3 py-2 border border-gray-200 rounded-lg input-focus text-sm"
+                                placeholder="例如：stock">
+                        </div>
+                        <div class="flex gap-2">
+                            <button id="confirm-add-type"
+                                class="flex-1 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-all duration-300 text-sm">
+                                确定
+                            </button>
+                            <button id="cancel-add-type"
+                                class="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-all duration-300 text-sm">
+                                取消
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 加号按钮 -->
+                <div class="mt-4 flex justify-center">
+                    <button id="show-add-type-form"
+                        class="w-10 h-10 rounded-full bg-primary text-white hover:bg-primary/90 transition-all duration-300 flex items-center justify-center text-xl shadow-sm">
+                        <i class="fa fa-plus"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 模态框底部 -->
+            <div class="p-5 border-t border-gray-200">
+                <button id="refresh-types-button"
+                    class="w-full px-4 py-2.5 bg-primary text-white rounded-lg hover:bg-primary/90 transition-all duration-300 text-sm font-medium">
+                    <i class="fa fa-refresh mr-2"></i>刷新
+                </button>
+            </div>
+        </div>
+    </div>
 
     <script src="assets/js/utils.js"></script>
     <script src="/static/api/api.js"></script>

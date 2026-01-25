@@ -148,26 +148,29 @@ func (sc *SyncClient) SyncFromCloud(lastSyncTime time.Time) error {
 }
 
 // FullSync 完整同步（先上传，再下载）
-// 设备A 修改记录1（时刻1） - 修改记录3（时刻2） - 修改记录5（时刻3）
-// 设备B 修改记录2（时刻1） - 修改记录4（时刻2）
-
-// 设备B同步，是不是只能同步到设备A修改记录5的记录？
+// 修复后的逻辑：
+// 1. 在上传前获取最后同步时间（避免上传过程中的边界情况）
+// 2. 上传本地未同步数据到云端
+// 3. 从云端下载该时间点之后的所有更新
+// 4. 更新最后同步时间为当前时间
 func (sc *SyncClient) FullSync() error {
+	// 0. 在上传前获取最后同步时间（关键修复：避免遗漏数据）
+	lastSyncTime := GetLastSyncTime()
+
 	// 1. 先上传本地数据到云端
 	if err := sc.SyncToCloud(); err != nil {
 		return fmt.Errorf("上传到云端失败: %w", err)
 	}
 
-	// 2. 获取本地最后同步时间（使用最新记录的更新时间）
-	var lastSyncTime time.Time
-	var latestWorth WorthModel
-	if err := Mysql.Order("updated_at DESC").Take(&latestWorth).Error; err == nil {
-		lastSyncTime = latestWorth.UpdatedAt
-	}
-
-	// 3. 从云端下载数据
+	// 2. 从云端下载数据（使用上传前的时间，确保不遗漏）
 	if err := sc.SyncFromCloud(lastSyncTime); err != nil {
 		return fmt.Errorf("从云端下载失败: %w", err)
+	}
+
+	// 3. 更新最后同步时间为当前时间
+	if err := UpdateLastSyncTime(time.Now()); err != nil {
+		// 即使更新失败，也不影响同步，只记录警告
+		logger.Warnf("更新最后同步时间失败: %v", err)
 	}
 
 	return nil

@@ -2,22 +2,33 @@ package server
 
 import (
 	"fmt"
+	"time"
 
 	"gorm.io/gorm"
 )
 
-// 记录现值
+// FTypeModel 资金类型表（支持动态添加/删除类型）
+type FTypeModel struct {
+	gorm.Model
+	Name  string `gorm:"column:name; type:varchar(50); not null; unique; comment:类型名称（英文，如 cash、stock_a）" json:"name"`
+	Cname string `gorm:"column:cname; type:varchar(50); not null; comment:类型中文名称（如 现金、A股）" json:"cname"`
+	Order int    `gorm:"column:order; type:int; default:0; comment:排序顺序" json:"order"`
+}
+
+// WorthModel 现值主表
 type WorthModel struct {
-	gorm.Model         // 内置模型结构体，包含 ID、CreatedAt、UpdatedAt、DeletedAt 字段
-	Time       string  `gorm:"column:time; type:varchar(100); comment:现值时刻"`
-	Cash       float64 `gorm:"column:cash; type:decimal(12,2); comment:现金"`
-	StockA     float64 `gorm:"column:stock_a; type:decimal(12,2); comment:A股"`
-	StockM     float64 `gorm:"column:stock_m; type:decimal(12,2); comment:M股"`
-	Hongli     float64 `gorm:"column:hongli; type:decimal(12,2); comment:红利"`
-	Bond       float64 `gorm:"column:bond; type:decimal(12,2); comment:债券"`
-	Debt       float64 `gorm:"column:debt; type:decimal(12,2); comment:债权"`
-	// 同步相关字段（用于数据同步）
-	SyncStatus int `gorm:"column:sync_status; type:int; default:0; comment:同步状态 0-未同步 1-已同步" json:"sync_status,omitempty"`
+	gorm.Model                  // 内置字段：ID, CreatedAt, UpdatedAt, DeletedAt
+	Time       string           `gorm:"column:time; type:varchar(100); comment:现值时刻"`
+	TypeWorths []TypeWorthModel `gorm:"foreignKey:WorthID; comment:该现值下的各类型价值列表"`
+	SyncStatus int              `gorm:"column:sync_status; type:int; default:0; comment:同步状态 0-未同步 1-已同步" json:"sync_status,omitempty"`
+}
+
+// TypeWorthModel 各类型价值表（关联到现值主表，使用类型名而非外键）
+type TypeWorthModel struct {
+	gorm.Model
+	WorthID  uint    `gorm:"column:worth_id; not null; index; comment:关联的现值主表ID"`
+	TypeName string  `gorm:"column:type_name; type:varchar(50); not null; index; comment:资金类型名称（如 cash、stock_a）"`
+	Value    float64 `gorm:"column:value; type:decimal(16,2); not null; default:0; comment:价值数值"`
 }
 
 // FlowRecordModel 资金流动记录表
@@ -26,16 +37,36 @@ type FlowRecordModel struct {
 	Time       string  `gorm:"column:time;type:varchar(100);comment:时间" json:"time"`
 	Type       string  `gorm:"column:type;type:varchar(100);comment:类型" json:"type"`
 	Value      float64 `gorm:"column:value;type:decimal(12,2);comment:金额" json:"value"`
-	// 同步相关字段（用于数据同步）
-	SyncStatus int `gorm:"column:sync_status; type:int; default:0; comment:同步状态 0-未同步 1-已同步" json:"sync_status,omitempty"`
+	SyncStatus int     `gorm:"column:sync_status; type:int; default:0; comment:同步状态 0-未同步 1-已同步" json:"sync_status,omitempty"`
 }
 
+// Create 创建现值记录（包含关联的类型价值记录）
 func (w WorthModel) Create() error {
-	result := Mysql.Create(&w)
-	if result.Error != nil {
-		return result.Error
+	return Mysql.Transaction(func(tx *gorm.DB) error {
+		// 创建主记录
+		if err := tx.Create(&w).Error; err != nil {
+			return err
+		}
+		// 创建关联的类型价值记录
+		if len(w.TypeWorths) > 0 {
+			for i := range w.TypeWorths {
+				w.TypeWorths[i].WorthID = w.ID
+			}
+			if err := tx.Create(&w.TypeWorths).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+// GetWithTypes 获取现值记录并加载关联的类型价值
+func (w WorthModel) GetWithTypes() (*WorthModel, error) {
+	var worth WorthModel
+	if err := Mysql.Preload("TypeWorths").Where("id = ?", w.ID).First(&worth).Error; err != nil {
+		return nil, err
 	}
-	return nil
+	return &worth, nil
 }
 
 func (f FlowRecordModel) Create() error {
@@ -59,10 +90,11 @@ func (f FlowRecordModel) CreateInBatch(records []FlowRecordModel) error {
 	})
 }
 
+// GetLatestWorth 获取最新的现值记录（包含关联的类型价值）
 func (w WorthModel) GetLatestWorth() (*WorthModel, error) {
 	var latestWorth WorthModel
-	// Order("time DESC") 按自定义时间字段降序
-	result := Mysql.Order("time DESC").Take(&latestWorth)
+	// Order("time DESC") 按自定义时间字段降序，并预加载关联的类型价值
+	result := Mysql.Preload("TypeWorths").Order("time DESC").Take(&latestWorth)
 	if result.Error != nil {
 		if result.Error == gorm.ErrRecordNotFound {
 			return nil, fmt.Errorf("未找到任何现值记录")
@@ -72,10 +104,11 @@ func (w WorthModel) GetLatestWorth() (*WorthModel, error) {
 	return &latestWorth, nil
 }
 
-// 查询指定时间之间的所有记录（包含时间边界）
+// QueryByTime 查询指定时间之间的所有记录（包含时间边界，并加载关联的类型价值）
 func (w WorthModel) QueryByTime(startDate, endDate string) ([]WorthModel, error) {
 	var worths []WorthModel
-	result := Mysql.Where("time >= ? AND time <= ?", startDate, endDate).Find(&worths)
+	result := Mysql.Preload("TypeWorths").Where("time >= ? AND time <= ?", startDate, endDate).
+		Order("time ASC").Find(&worths)
 	if result.Error != nil {
 		return nil, result.Error
 	}
@@ -107,6 +140,70 @@ type RequestRecordModel struct {
 	Latency            string `gorm:"column:latency; type:string; size:100; comment:耗时;"`
 }
 
+// SyncMetadataModel 同步元数据表（记录最后同步时间）
+type SyncMetadataModel struct {
+	gorm.Model
+	LastSyncTime time.Time `gorm:"column:last_sync_time; type:datetime; comment:最后同步时间"`
+}
+
 func (f *RequestRecordModel) Create() {
 	Mysql.Create(&f)
+}
+
+// FTypeModel 相关方法
+
+// GetAllTypes 获取所有未删除的资金类型（按排序顺序）
+func (f FTypeModel) GetAllTypes() ([]FTypeModel, error) {
+	var types []FTypeModel
+	if err := Mysql.Order("`order` ASC, id ASC").Find(&types).Error; err != nil {
+		return nil, err
+	}
+	return types, nil
+}
+
+// InitDefaultTypes 初始化默认资金类型（确保 cash 类型存在）
+func InitDefaultTypes() error {
+	var existing FTypeModel
+	err := Mysql.Where("name = ?", "cash").First(&existing).Error
+
+	if err == gorm.ErrRecordNotFound {
+		// cash 类型不存在，创建它
+		cashType := FTypeModel{
+			Name:  "cash",
+			Cname: "现金",
+			Order: 0, // 现金排在第一位
+		}
+		if err := cashType.Create(); err != nil {
+			return fmt.Errorf("创建默认 cash 类型失败: %w", err)
+		}
+	} else if err != nil {
+		return fmt.Errorf("查询 cash 类型失败: %w", err)
+	}
+	// 如果已存在，不做任何操作
+
+	return nil
+}
+
+// GetTypeByName 根据名称获取资金类型
+func (f FTypeModel) GetTypeByName(name string) (*FTypeModel, error) {
+	var ftype FTypeModel
+	if err := Mysql.Where("name = ?", name).First(&ftype).Error; err != nil {
+		return nil, err
+	}
+	return &ftype, nil
+}
+
+// Create 创建资金类型
+func (f FTypeModel) Create() error {
+	return Mysql.Create(&f).Error
+}
+
+// Update 更新资金类型
+func (f FTypeModel) Update() error {
+	return Mysql.Save(&f).Error
+}
+
+// Delete 删除资金类型（软删除）
+func (f FTypeModel) Delete() error {
+	return Mysql.Delete(&f).Error
 }
