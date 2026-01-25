@@ -1,15 +1,20 @@
 @echo off
 REM Windows build script
-REM 使用方法：在项目根目录运行 scripts\build.bat
+REM 使用方法：可以在项目根目录或 scripts 目录运行此脚本
+
+REM 如果当前在 scripts 目录，切换到项目根目录
+if exist "build.bat" (
+    cd ..
+)
 
 REM 检查是否在项目根目录
 if not exist "go.mod" (
-    echo 错误：请在项目根目录运行此脚本
+    echo 错误：请在项目根目录运行此脚本，或从 scripts 目录运行
     pause
     exit /b 1
 )
 if not exist "bin" (
-    echo 错误：请在项目根目录运行此脚本
+    echo 错误：请在项目根目录运行此脚本，或从 scripts 目录运行
     pause
     exit /b 1
 )

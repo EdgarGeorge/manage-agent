@@ -249,7 +249,13 @@ document.addEventListener('DOMContentLoaded', () => {
         dom.currentDate.textContent = new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
 
         const today = new Date(), year = today.getFullYear();
-        const formatDate = (date) => date.toISOString().split('T')[0];
+        // 使用本地时间格式化，避免时区问题
+        const formatDate = (date) => {
+            const y = date.getFullYear();
+            const m = String(date.getMonth() + 1).padStart(2, '0');
+            const d = String(date.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        };
         dom.startDateInput.value = formatDate(new Date(year, 0, 1));
         dom.endDateInput.value = formatDate(new Date(year, 11, 31));
 
