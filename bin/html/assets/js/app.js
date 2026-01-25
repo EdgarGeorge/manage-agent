@@ -195,7 +195,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const handleSubmitWorth = async () => {
         const { worthTimeInput, worthInputsContainer } = dom;
-        const payload = { time: formatDateTimeLocal(worthTimeInput.value) };
+        const payload = {
+            time: formatDateTimeLocal(worthTimeInput.value),
+            type_worths: []
+        };
+
         worthInputsContainer.querySelectorAll('input[type="text"]').forEach(input => {
             let value = 0;
             const expression = input.value.trim();
@@ -209,8 +213,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 value = parseFloat(expression.replace(/,/g, '')) || 0;
             }
 
-            payload[input.dataset.name] = isNaN(value) ? 0 : value;
+            // 只添加非零值
+            if (!isNaN(value) && value !== 0) {
+                payload.type_worths.push({
+                    type_name: input.dataset.name,
+                    value: value
+                });
+            }
         });
+
         try {
             const data = await api.submitWorth(payload);
             alert(data.code === 200 ? '提交成功！' : `提交失败: ${data.msg || '未知错误'}`);

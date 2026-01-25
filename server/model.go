@@ -51,6 +51,8 @@ func (w WorthModel) Create() error {
 		if len(w.TypeWorths) > 0 {
 			for i := range w.TypeWorths {
 				w.TypeWorths[i].WorthID = w.ID
+				// 确保 ID 为 0，让 GORM 自动生成
+				w.TypeWorths[i].ID = 0
 			}
 			if err := tx.Create(&w.TypeWorths).Error; err != nil {
 				return err

@@ -302,6 +302,7 @@ func CreateWorthCtl(c *gin.Context) error {
 	typeWorths := make([]TypeWorthModel, 0, len(worthJson.TypeWorths))
 	for _, tw := range worthJson.TypeWorths {
 		typeWorths = append(typeWorths, TypeWorthModel{
+			Model:    gorm.Model{}, // 确保 ID 为 0，让 GORM 自动生成
 			TypeName: tw.TypeName,
 			Value:    tw.Value,
 		})
@@ -354,7 +355,7 @@ func CreateFTypeCtl(c *gin.Context) error {
 	// 检查是否存在（包括软删除的记录）
 	var existing FTypeModel
 	err := Mysql.Unscoped().Where("name = ?", ftypeJson.Name).First(&existing).Error
-	
+
 	if err == nil {
 		// 记录已存在
 		if existing.DeletedAt.Valid {
