@@ -43,18 +43,22 @@ type FlowRecordModel struct {
 // Create 创建现值记录（包含关联的类型价值记录）
 func (w WorthModel) Create() error {
 	return Mysql.Transaction(func(tx *gorm.DB) error {
-		// 创建主记录
-		if err := tx.Create(&w).Error; err != nil {
+		// 先保存关联记录
+		typeWorths := w.TypeWorths
+
+		// 创建主记录时，使用 Select 只创建主记录字段，避免自动创建关联
+		if err := tx.Omit("TypeWorths").Create(&w).Error; err != nil {
 			return err
 		}
-		// 创建关联的类型价值记录
-		if len(w.TypeWorths) > 0 {
-			for i := range w.TypeWorths {
-				w.TypeWorths[i].WorthID = w.ID
+
+		// 手动创建关联的类型价值记录
+		if len(typeWorths) > 0 {
+			for i := range typeWorths {
+				typeWorths[i].WorthID = w.ID
 				// 确保 ID 为 0，让 GORM 自动生成
-				w.TypeWorths[i].ID = 0
+				typeWorths[i].ID = 0
 			}
-			if err := tx.Create(&w.TypeWorths).Error; err != nil {
+			if err := tx.Create(&typeWorths).Error; err != nil {
 				return err
 			}
 		}
