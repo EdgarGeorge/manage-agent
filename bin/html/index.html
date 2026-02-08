@@ -47,12 +47,18 @@
     <main class="container mx-auto px-4 py-6">
         <!-- 第一行：输入区域 + 当前配比 + 资金流动记录 -->
         <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
-            <!-- 资金流动记录（移动到最左侧，并占据两列） -->
+            <!-- 资金流动记录（占据两列） -->
             <div
                 class="bg-white rounded-xl p-5 card-shadow transition-all duration-300 hover:shadow-lg lg:col-span-2 flex flex-col">
-                <h2 class="text-lg font-semibold mb-4 text-dark flex items-center">
-                    <i class="fa fa-exchange text-primary mr-2"></i>资金流动记录
-                </h2>
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-semibold text-dark flex items-center">
+                        <i class="fa fa-exchange text-primary mr-2"></i>资金流动记录
+                    </h2>
+                    <button id="show-flow-history"
+                        class="text-primary text-sm font-medium hover:text-blue-700 transition-all">
+                        记录
+                    </button>
+                </div>
                 <p class="text-xs text-neutral mb-4">
                     点击理财, 修改理财项目<br>
                     外部资金首先流入到现金, 再从现金到各理财项目<br>
@@ -90,31 +96,39 @@
                     </div>
 
                     <!-- 输入：放在三枚圆圈下方 -->
-                    <div class="w-full max-w-4xl mx-auto">
-                        <div class="flex flex-col lg:flex-row lg:items-center gap-3">
+                    <div class="w-full max-w-5xl mx-auto">
+                        <div class="flex flex-col lg:flex-row lg:flex-nowrap lg:items-center gap-2">
                             <input type="datetime-local" id="flow-time-input"
-                                class="lg:w-52 px-3 py-2 border border-gray-200 rounded-lg input-focus text-sm">
+                                class="w-full lg:w-48 shrink-0 px-2 py-2 border border-gray-200 rounded-lg input-focus text-sm">
                             <select id="flow-type-select"
-                                class="lg:w-40 px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white input-focus">
+                                class="w-full lg:w-32 shrink-0 px-2 py-2 border border-gray-200 rounded-lg text-sm bg-white input-focus">
                                 <option>加载中...</option>
                             </select>
                             <input id="flow-value-input" type="number"
-                                class="flex-1 min-w-[140px] px-3 py-2 border border-gray-200 rounded-lg input-focus text-sm"
+                                class="w-full lg:flex-1 min-w-0 px-3 py-2 border border-gray-200 rounded-lg input-focus text-sm"
                                 placeholder="输入金额">
-                            <button id="submit-flow-button"
-                                class="w-full lg:w-auto px-6 py-2.5 bg-primary text-white rounded-xl hover:bg-primary/90 transition-all duration-300 shadow-sm">
-                                确定
-                            </button>
+                            <div class="flex gap-2 shrink-0 w-full lg:w-auto">
+                                <button id="submit-flow-button"
+                                    class="flex-1 lg:px-6 py-2.5 bg-primary text-white rounded-xl hover:bg-primary/90 transition-all duration-300 shadow-sm whitespace-nowrap">
+                                    确定
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- 当前市值输入（移动到右侧） -->
-            <div class="bg-white rounded-xl p-5 card-shadow transition-all duration-300 hover:shadow-lg">
-                <h2 class="text-lg font-semibold mb-4 text-dark flex items-center">
-                    <i class="fa fa-pencil-square-o text-primary mr-2"></i>输入当前市值
-                </h2>
+            <!-- 当前市值输入 (1列) -->
+            <div class="bg-white rounded-xl p-5 card-shadow transition-all duration-300 hover:shadow-lg flex flex-col">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-semibold text-dark flex items-center">
+                        <i class="fa fa-pencil-square-o text-primary mr-2"></i>输入当前市值
+                    </h2>
+                    <button id="show-worth-history"
+                        class="text-primary text-sm font-medium hover:text-blue-700 transition-all">
+                        记录
+                    </button>
+                </div>
                 <p class="text-xs text-neutral mb-4">输入框支持加法表达式</p>
 
                 <div class="flex items-center mb-3">
@@ -123,18 +137,18 @@
                         class="flex-1 px-3 py-2 border border-gray-200 rounded-lg input-focus text-sm">
                 </div>
 
-                <div id="worth-inputs-container" class="space-y-3">
+                <div id="worth-inputs-container" class="space-y-3 flex-1 overflow-y-auto max-h-[300px] pr-1">
                     <!-- 市值输入项将动态生成在这里 -->
                 </div>
 
                 <button id="submit-worth-button"
-                    class="w-full mt-5 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-all duration-300 flex items-center justify-center">
+                    class="w-full mt-5 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-all duration-300 flex items-center justify-center shrink-0">
                     <i class="fa fa-paper-plane mr-2"></i>提交
                 </button>
             </div>
 
-            <!-- 当前配比（移动到最右侧） -->
-            <div class="bg-white rounded-xl p-5 card-shadow transition-all duration-300 hover:shadow-lg">
+            <!-- 当前配比 (1列) -->
+            <div class="bg-white rounded-xl p-5 card-shadow transition-all duration-300 hover:shadow-lg flex flex-col">
                 <div class="flex items-center justify-between mb-4">
                     <h2 class="text-lg font-semibold text-dark flex items-center">
                         <i class="fa fa-pie-chart text-primary mr-2"></i>当前配比
@@ -153,8 +167,8 @@
                     </div>
                 </div>
 
-                <div class="h-64 flex flex-col">
-                    <div class="flex-1 flex items-center justify-center">
+                <div class="flex-1 flex flex-col">
+                    <div class="flex-1 flex items-center justify-center min-h-[200px]">
                         <canvas id="allocationChart"></canvas>
                     </div>
                     <div class="flex-none min-h-16 flex items-center justify-center pt-2">
@@ -162,6 +176,7 @@
                     </div>
                 </div>
             </div>
+        </div>
         </div>
 
         <!-- 第二行：展示区域 -->
@@ -249,6 +264,54 @@
             <p>© 2026 资产收益追踪系统 | 专业的个人资产管理工具</p>
         </div>
     </footer>
+
+    <!-- 流水记录模态框 -->
+    <div id="flow-history-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl mx-4 max-h-[80vh] flex flex-col">
+            <div class="flex items-center justify-between p-5 border-b border-gray-200">
+                <h3 class="text-lg font-semibold text-dark flex items-center">
+                    <i class="fa fa-exchange text-primary mr-2"></i>流水记录
+                </h3>
+                <button id="close-flow-history" class="text-neutral hover:text-dark transition-colors">
+                    <i class="fa fa-times text-xl"></i>
+                </button>
+            </div>
+            <div class="flex-1 overflow-y-auto p-5">
+                <div id="flow-history-list" class="space-y-3"></div>
+                <div class="mt-5 flex items-center justify-between">
+                    <button id="flow-history-prev"
+                        class="px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200 text-sm">上一页</button>
+                    <span id="flow-history-page" class="text-sm text-neutral">第 1 页</span>
+                    <button id="flow-history-next"
+                        class="px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200 text-sm">下一页</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 市值记录模态框 -->
+    <div id="worth-history-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl mx-4 max-h-[80vh] flex flex-col">
+            <div class="flex items-center justify-between p-5 border-b border-gray-200">
+                <h3 class="text-lg font-semibold text-dark flex items-center">
+                    <i class="fa fa-history text-primary mr-2"></i>市值记录
+                </h3>
+                <button id="close-worth-history" class="text-neutral hover:text-dark transition-colors">
+                    <i class="fa fa-times text-xl"></i>
+                </button>
+            </div>
+            <div class="flex-1 overflow-y-auto p-5">
+                <div id="worth-history-list" class="space-y-3"></div>
+                <div class="mt-5 flex items-center justify-between">
+                    <button id="worth-history-prev"
+                        class="px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200 text-sm">上一页</button>
+                    <span id="worth-history-page" class="text-sm text-neutral">第 1 页</span>
+                    <button id="worth-history-next"
+                        class="px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200 text-sm">下一页</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- 资金类型管理模态框 -->
     <div id="types-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">

@@ -64,6 +64,32 @@ const api = {
             method: 'DELETE'
         });
         return res.json();
+    },
+
+    // 市值记录查询与删除
+    fetchWorthHistory: async (pageIndex = 1, pageLimit = 10) => {
+        const res = await fetch(`${API_BASE}/worth/?page_index=${pageIndex}&page_limit=${pageLimit}`);
+        return res.json();
+    },
+
+    deleteWorthRecord: async (id) => {
+        const res = await fetch(`${API_BASE}/worth/${id}`, {
+            method: 'DELETE'
+        });
+        return res.json();
+    },
+
+    // 流水记录查询与删除
+    fetchFlowHistory: async (pageIndex = 1, pageLimit = 10) => {
+        const res = await fetch(`${API_BASE}/flow-record/?page_index=${pageIndex}&page_limit=${pageLimit}`);
+        return res.json();
+    },
+
+    deleteFlowRecord: async (id) => {
+        const res = await fetch(`${API_BASE}/flow-record/${id}`, {
+            method: 'DELETE'
+        });
+        return res.json();
     }
 };
 

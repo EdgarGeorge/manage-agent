@@ -30,6 +30,22 @@ document.addEventListener('DOMContentLoaded', () => {
         confirmAddType: document.getElementById('confirm-add-type'),
         cancelAddType: document.getElementById('cancel-add-type'),
         refreshTypesButton: document.getElementById('refresh-types-button'),
+        // 市值记录相关
+        showWorthHistoryButton: document.getElementById('show-worth-history'),
+        worthHistoryModal: document.getElementById('worth-history-modal'),
+        closeWorthHistory: document.getElementById('close-worth-history'),
+        worthHistoryList: document.getElementById('worth-history-list'),
+        worthHistoryPrev: document.getElementById('worth-history-prev'),
+        worthHistoryNext: document.getElementById('worth-history-next'),
+        worthHistoryPage: document.getElementById('worth-history-page'),
+        // 流水记录相关
+        showFlowHistoryButton: document.getElementById('show-flow-history'),
+        flowHistoryModal: document.getElementById('flow-history-modal'),
+        closeFlowHistory: document.getElementById('close-flow-history'),
+        flowHistoryList: document.getElementById('flow-history-list'),
+        flowHistoryPrev: document.getElementById('flow-history-prev'),
+        flowHistoryNext: document.getElementById('flow-history-next'),
+        flowHistoryPage: document.getElementById('flow-history-page'),
     };
 
     // --- 运行时状态 ---
@@ -37,7 +53,11 @@ document.addEventListener('DOMContentLoaded', () => {
         assetTypes: [],
         latestProfitData: null,
         charts: {},
-        allocationColorMap: {}
+        allocationColorMap: {},
+        worthHistoryPage: 1,
+        worthHistoryLimit: 10,
+        flowHistoryPage: 1,
+        flowHistoryLimit: 10
     };
 
     // --- 工具函数 ---
@@ -485,6 +505,195 @@ document.addEventListener('DOMContentLoaded', () => {
         closeTypesModal();
         location.reload();
     };
+
+    // --- 市值记录管理功能 ---
+    const loadWorthHistory = async () => {
+        try {
+            const response = await api.fetchWorthHistory(state.worthHistoryPage, state.worthHistoryLimit);
+            if (response.code === 200 && Array.isArray(response.data)) {
+                dom.worthHistoryList.innerHTML = '';
+                if (response.data.length === 0) {
+                    dom.worthHistoryList.innerHTML = '<div class="text-center text-neutral py-4">暂无历史记录</div>';
+                } else {
+                    response.data.forEach(record => {
+                        const item = document.createElement('div');
+                        item.className = 'flex flex-col md:flex-row md:items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-100 hover:bg-gray-100 transition-colors gap-3';
+
+                        // 组装类型价值详情
+                        const detailsHtml = record.type_worths.map(tw => `
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-white border border-gray-200 text-neutral">
+                                ${tw.type_name}: ${formatNumber(tw.value)}
+                            </span>
+                        `).join('');
+
+                        item.innerHTML = `
+                            <div class="flex-1">
+                                <div class="text-sm font-bold text-dark mb-2">${record.time}</div>
+                                <div class="flex flex-wrap gap-2">${detailsHtml}</div>
+                            </div>
+                            <button class="delete-worth-btn p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors self-end md:self-center" 
+                                    data-id="${record.id}">
+                                <i class="fa fa-trash"></i>
+                            </button>
+                        `;
+                        dom.worthHistoryList.appendChild(item);
+                    });
+                }
+
+                dom.worthHistoryPage.textContent = `第 ${state.worthHistoryPage} 页`;
+
+                // 绑定删除事件
+                dom.worthHistoryList.querySelectorAll('.delete-worth-btn').forEach(btn => {
+                    btn.addEventListener('click', async (e) => {
+                        const id = e.currentTarget.dataset.id;
+                        if (confirm('确定要删除这条市值记录吗？这将无法撤销。')) {
+                            try {
+                                const response = await api.deleteWorthRecord(id);
+                                if (response.code === 200) {
+                                    await loadWorthHistory();
+                                } else {
+                                    alert(`删除失败: ${response.msg || '未知错误'}`);
+                                }
+                            } catch (error) {
+                                alert('删除请求失败');
+                            }
+                        }
+                    });
+                });
+            }
+        } catch (error) {
+            alert('加载市值历史记录失败');
+        }
+    };
+
+    const openWorthHistoryModal = async () => {
+        state.worthHistoryPage = 1;
+        dom.worthHistoryModal.classList.remove('hidden');
+        dom.worthHistoryModal.classList.add('flex');
+        await loadWorthHistory();
+    };
+
+    const closeWorthHistoryModal = () => {
+        dom.worthHistoryModal.classList.add('hidden');
+        dom.worthHistoryModal.classList.remove('flex');
+    };
+
+    // --- 流水记录管理功能 ---
+    const loadFlowHistory = async () => {
+        try {
+            const response = await api.fetchFlowHistory(state.flowHistoryPage, state.flowHistoryLimit);
+            if (response.code === 200 && Array.isArray(response.data)) {
+                dom.flowHistoryList.innerHTML = '';
+                if (response.data.length === 0) {
+                    dom.flowHistoryList.innerHTML = '<div class="text-center text-neutral py-4">暂无历史记录</div>';
+                } else {
+                    response.data.forEach(record => {
+                        const item = document.createElement('div');
+                        item.className = 'flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-100 hover:bg-gray-100 transition-colors';
+
+                        const valueClass = record.value >= 0 ? 'text-danger' : 'text-success';
+                        const typeCname = state.assetTypes.find(t => t.name === record.type)?.cname || record.type;
+
+                        item.innerHTML = `
+                            <div class="flex-1">
+                                <div class="text-xs text-neutral mb-1">${record.time}</div>
+                                <div class="text-sm">
+                                    <span class="font-medium text-dark">${typeCname}</span>
+                                    <span class="ml-2 ${valueClass} font-bold">${record.value >= 0 ? '+' : ''}${formatNumber(record.value)}</span>
+                                </div>
+                            </div>
+                            <button class="delete-flow-btn p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors" 
+                                    data-id="${record.id}">
+                                <i class="fa fa-trash"></i>
+                            </button>
+                        `;
+                        dom.flowHistoryList.appendChild(item);
+                    });
+                }
+
+                dom.flowHistoryPage.textContent = `第 ${state.flowHistoryPage} 页`;
+
+                // 绑定删除事件
+                dom.flowHistoryList.querySelectorAll('.delete-flow-btn').forEach(btn => {
+                    btn.addEventListener('click', async (e) => {
+                        const id = e.currentTarget.dataset.id;
+                        if (confirm('确定要删除这条流水记录吗？这将无法撤销。')) {
+                            try {
+                                const response = await api.deleteFlowRecord(id);
+                                if (response.code === 200) {
+                                    await loadFlowHistory();
+                                    // 刷新收益数据，因为流水变了
+                                    dom.calculateProfitButton.click();
+                                } else {
+                                    alert(`删除失败: ${response.msg || '未知错误'}`);
+                                }
+                            } catch (error) {
+                                alert('删除请求失败');
+                            }
+                        }
+                    });
+                });
+            }
+        } catch (error) {
+            alert('加载流水历史记录失败');
+        }
+    };
+
+    const openFlowHistoryModal = async () => {
+        state.flowHistoryPage = 1;
+        dom.flowHistoryModal.classList.remove('hidden');
+        dom.flowHistoryModal.classList.add('flex');
+        await loadFlowHistory();
+    };
+
+    const closeFlowHistoryModal = () => {
+        dom.flowHistoryModal.classList.add('hidden');
+        dom.flowHistoryModal.classList.remove('flex');
+    };
+
+    // 绑定市值记录相关事件
+    if (dom.showWorthHistoryButton) {
+        dom.showWorthHistoryButton.addEventListener('click', openWorthHistoryModal);
+    }
+    if (dom.closeWorthHistory) {
+        dom.closeWorthHistory.addEventListener('click', closeWorthHistoryModal);
+    }
+    if (dom.worthHistoryPrev) {
+        dom.worthHistoryPrev.addEventListener('click', async () => {
+            if (state.worthHistoryPage > 1) {
+                state.worthHistoryPage--;
+                await loadWorthHistory();
+            }
+        });
+    }
+    if (dom.worthHistoryNext) {
+        dom.worthHistoryNext.addEventListener('click', async () => {
+            state.worthHistoryPage++;
+            await loadWorthHistory();
+        });
+    }
+
+    // 绑定流水记录相关事件
+    if (dom.showFlowHistoryButton) {
+        dom.showFlowHistoryButton.addEventListener('click', openFlowHistoryModal);
+    }
+    if (dom.closeFlowHistory) {
+        dom.closeFlowHistory.addEventListener('click', closeFlowHistoryModal);
+    }
+    if (dom.flowHistoryPrev) {
+        dom.flowHistoryPrev.addEventListener('click', async () => {
+            if (state.flowHistoryPage > 1) {
+                state.flowHistoryPage--;
+                await loadFlowHistory();
+            }
+        });
+    }
+    if (dom.flowHistoryNext) {
+        dom.flowHistoryNext.addEventListener('click', async () => {
+            state.flowHistoryPage++;
+            await loadFlowHistory();
+        });
+    }
 
     // 绑定资金类型管理事件
     if (dom.manageTypesButton) {

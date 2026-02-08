@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -262,6 +263,7 @@ func QueryHistoryProfit(c *gin.Context) ([]map[string]any, error) {
 
 // WorthJSON 现值记录 JSON 结构（支持动态类型）
 type WorthJSON struct {
+	ID         uint            `json:"id"`          // 记录ID
 	Time       string          `json:"time"`        // 现值时刻
 	TypeWorths []TypeWorthJSON `json:"type_worths"` // 各类型价值列表
 }
@@ -441,6 +443,7 @@ func DeleteFTypeCtl(c *gin.Context) error {
 }
 
 type FlowRecordJson struct {
+	ID    uint    `json:"id"` // 记录ID
 	Time  string  `json:"time"`
 	Type  string  `json:"type"`
 	Value float64 `json:"value"`
@@ -451,28 +454,6 @@ func CreateFlowRecordCtl(c *gin.Context) error {
 	if err := c.ShouldBindJSON(&flowRecordJson); err != nil {
 		return err
 	}
-	// var worthModel WorthModel
-	// lastWorth, err := worthModel.GetLatestWorth()
-	// if err != nil {
-	// 	return err
-	// }
-
-	// worth := 0.0
-
-	// switch flowRecordJson.Type {
-	// case "cash":
-	// 	worth = lastWorth.Cash
-	// case "stock_a":
-	// 	worth = lastWorth.StockA
-	// case "stock_m":
-	// 	worth = lastWorth.StockM
-	// case "hongli":
-	// 	worth = lastWorth.Hongli
-	// case "bond":
-	// 	worth = lastWorth.Bond
-	// case "debt":
-	// 	worth = lastWorth.Debt
-	// }
 
 	currentTime := flowRecordJson.Time
 	if currentTime == "" {
@@ -483,7 +464,7 @@ func CreateFlowRecordCtl(c *gin.Context) error {
 	modelList := []FlowRecordModel{}
 	switch flowRecordJson.Type {
 	case "cash":
-		// ?? 不支持批量变动，导致数据校验出错
+		// ?? 批量变动，导致数据校验出错，暂时不用
 		// if worth+flowRecordJson.Value < 0 {
 		// 	return fmt.Errorf("现值不能为负，%s 当前值 %f, 变化值 %f", flowRecordJson.Type, worth, flowRecordJson.Value)
 		// }
@@ -493,7 +474,7 @@ func CreateFlowRecordCtl(c *gin.Context) error {
 			Value: flowRecordJson.Value,
 		})
 
-	case "stock_a", "stock_m", "hongli", "bond", "debt":
+	default:
 
 		// if worth+flowRecordJson.Value < 0 {
 		// 	return fmt.Errorf("现值不能为负，%s 当前值 %f, 变化值 %f", flowRecordJson.Type, worth, flowRecordJson.Value)
@@ -517,5 +498,122 @@ func CreateFlowRecordCtl(c *gin.Context) error {
 	if err := flowRecordModel.CreateInBatch(modelList); err != nil {
 		return err
 	}
+	return nil
+}
+
+func QueryWorthCtl(c *gin.Context) ([]WorthJSON, error) {
+	pageIndexStr := c.DefaultQuery("page_index", "1")
+	pageLimitStr := c.DefaultQuery("page_limit", "10")
+
+	pageIndex, err := strconv.Atoi(pageIndexStr)
+	if err != nil || pageIndex <= 0 {
+		pageIndex = 1
+	}
+	pageLimit, err := strconv.Atoi(pageLimitStr)
+	if err != nil || pageLimit <= 0 {
+		pageLimit = 10
+	}
+
+	worthModel := WorthModel{}
+	worthList, err := worthModel.Query(pageIndex, pageLimit)
+	if err != nil {
+		return nil, err
+	}
+
+	res := make([]WorthJSON, 0, len(worthList))
+	for _, worth := range worthList {
+		typeWorths := make([]TypeWorthJSON, 0, len(worth.TypeWorths))
+		for _, tw := range worth.TypeWorths {
+			typeWorths = append(typeWorths, TypeWorthJSON{
+				TypeName: tw.TypeName,
+				Value:    tw.Value,
+			})
+		}
+
+		res = append(res, WorthJSON{
+			ID:         worth.ID,
+			Time:       worth.Time,
+			TypeWorths: typeWorths,
+		})
+	}
+
+	return res, nil
+}
+
+func QueryFlowRecordCtl(c *gin.Context) ([]FlowRecordJson, error) {
+	pageIndexStr := c.DefaultQuery("page_index", "1")
+	pageLimitStr := c.DefaultQuery("page_limit", "10")
+	pageIndex, err := strconv.Atoi(pageIndexStr)
+	if err != nil || pageIndex <= 0 {
+		pageIndex = 1
+	}
+	pageLimit, err := strconv.Atoi(pageLimitStr)
+	if err != nil || pageLimit <= 0 {
+		pageLimit = 10
+	}
+	flowRecordModel := FlowRecordModel{}
+	recordList, err := flowRecordModel.Query(pageIndex, pageLimit)
+	if err != nil {
+		return nil, err
+	}
+
+	res := make([]FlowRecordJson, 0, len(recordList))
+	for _, record := range recordList {
+		res = append(res, FlowRecordJson{
+			ID:    record.ID,
+			Time:  record.Time,
+			Type:  record.Type,
+			Value: record.Value,
+		})
+	}
+
+	return res, nil
+
+}
+
+// DeleteWorthCtl 删除现值记录
+func DeleteWorthCtl(id uint) error {
+	// idStr := c.Param("id")
+	// if idStr == "" {
+	// 	return fmt.Errorf("ID不能为空")
+	// }
+
+	// id, err := strconv.Atoi(idStr)
+	// if err != nil {
+	// 	return fmt.Errorf("无效的ID格式: %w", err)
+	// }
+
+	return Mysql.Transaction(func(tx *gorm.DB) error {
+		// 1. 删除关联的子表记录 (TypeWorthModel)
+		if err := tx.Where("worth_id = ?", id).Delete(&TypeWorthModel{}).Error; err != nil {
+			return fmt.Errorf("删除关联价值记录失败: %w", err)
+		}
+
+		// 2. 删除主记录 (WorthModel)
+		if err := tx.Delete(&WorthModel{}, id).Error; err != nil {
+			return fmt.Errorf("删除现值主记录失败: %w", err)
+		}
+
+		return nil
+	})
+}
+
+// DeleteFlowRecordCtl 删除流水记录
+func DeleteFlowRecordCtl(id uint) error {
+	// idStr := c.Param("id")
+	// if idStr == "" {
+	// 	return fmt.Errorf("ID不能为空")
+	// }
+
+	// id, err := strconv.Atoi(idStr)
+	// if err != nil {
+	// 	return fmt.Errorf("无效的ID格式: %w", err)
+	// }
+
+	// 执行软删除
+	if err := Mysql.Delete(&FlowRecordModel{}, id).Error; err != nil {
+		return fmt.Errorf("删除流水记录失败: %w", err)
+	}
+
 	return nil
 }

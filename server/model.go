@@ -75,6 +75,14 @@ func (w WorthModel) GetWithTypes() (*WorthModel, error) {
 	return &worth, nil
 }
 
+// Query 分页查询现值记录（包含关联数据）
+func (w WorthModel) Query(pageIndex, pageLimit int) ([]WorthModel, error) {
+	var worthList []WorthModel
+	offset := (pageIndex - 1) * pageLimit
+	err := Mysql.Preload("TypeWorths").Order("time DESC").Offset(offset).Limit(pageLimit).Find(&worthList).Error
+	return worthList, err
+}
+
 func (f FlowRecordModel) Create() error {
 	result := Mysql.Create(&f)
 	if result.Error != nil {
@@ -94,6 +102,14 @@ func (f FlowRecordModel) CreateInBatch(records []FlowRecordModel) error {
 		}
 		return nil
 	})
+}
+
+// Query 分页查询流水记录
+func (f FlowRecordModel) Query(pageIndex, pageLimit int) ([]FlowRecordModel, error) {
+	var recordList []FlowRecordModel
+	offset := (pageIndex - 1) * pageLimit
+	err := Mysql.Order("time DESC").Offset(offset).Limit(pageLimit).Find(&recordList).Error
+	return recordList, err
 }
 
 // GetLatestWorth 获取最新的现值记录（包含关联的类型价值）
